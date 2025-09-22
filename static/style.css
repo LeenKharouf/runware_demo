@@ -1,0 +1,95 @@
+/* Center everything */
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  background-color: #202028;
+  color: #f5f6fa;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start; /* keeps header at top */
+  text-align: center;
+}
+
+/* Big welcoming title */
+h1 {
+  font-size: 3.5rem;
+  margin-top: 40px;
+  margin-bottom: 10px;
+  color: #ffffff;
+}
+
+/* Fun subtitle */
+h2 {
+  font-size: 1.2rem;
+  font-weight: 400;
+  margin-bottom: 30px;
+  color: #b3b3c6;
+}
+
+p{
+  font-size: 1.7rem;
+  font-weight: 400;
+  margin-bottom: 30px;
+  color: #b3b3c6;
+}
+
+/* Input row centered */
+.row {
+  display: flex;
+  justify-content: center;
+  gap: 16px;           /* more space between input + buttons */
+  margin: 20px 0;
+  width: 100%;
+  max-width: 900px;    /* wider row */
+}
+
+
+/* Make input bigger */
+input {
+  flex: 2;                  
+  background-color: #393B47;
+  color: #fff;
+  border: 1px solid #2a2d36;
+  padding: 10px 12px;        
+  font-size: 16px;
+  border-radius: 8px;
+}
+
+
+/* Make buttons larger + fun */
+button {
+  background-color: #7c5cff; /* default purple */
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 14px 20px;
+  font-size: 18px;
+  border-radius: 8px;
+  border: none;              /* no border */
+  outline: none;
+  transition: background 0.2s ease;
+}
+
+button:hover {
+  background-color: #5f47c0; /* slightly dimmer purple */
+}
+
+
+/* Status message */
+#status {
+  margin-top: 20px;
+  font-size: 1rem;
+  color: #aaa;
+}
+
+/* Results (image/video) */
+img, video {
+  max-width: 80%;
+  margin-top: 30px;
+  border-radius: 10px;
+  border: 2px solid #2a2d36;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.4);
+}

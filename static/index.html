@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Runware Demo</title>
+
+    <!-- Link to external CSS file (for styling) -->
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <!-- Title + subtitle -->
+    <h1>Build with Runware, in seconds</h1>
+    <p>Type a prompt, then click a button to see the magic.</p>
+
+    <!-- Input row: prompt box + buttons -->
+    <div class="row">
+      <!-- Where the user types their idea -->
+      <input id="prompt" placeholder="e.g., a fox in watercolor" style="flex:1" />
+
+      <!-- Buttons to trigger different endpoints -->
+      <button id="imgBtn">Image</button>
+      <button id="vidBtn">Video</button>
+      <button id="surpriseBtn">🎲 Surprise Me</button>
+    </div>
+
+    <!-- Status updates (e.g. “Generating…” or “Done ✅”) -->
+    <div id="status"></div>
+
+    <!-- Where generated images/videos will appear -->
+    <div id="result"></div>
+
+    <script>
+      // Grab references to elements in the page
+      const promptEl = document.getElementById('prompt');
+      const statusEl = document.getElementById('status');
+      const resultEl = document.getElementById('result');
+
+      // Generic function: call one of my Flask endpoints
+      async function callApi(endpoint) {
+        const prompt = promptEl.value.trim();
+        if (!prompt) {
+          alert("Please enter a prompt!");
+          return;
+        }
+
+        // Show a loading message
+        statusEl.textContent = "Generating… please wait ⏳";
+        resultEl.innerHTML = "";
+
+        try {
+          // Send prompt to backend (Flask)
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt })
+          });
+          const data = await res.json();
+
+          // Handle errors from backend
+          if (data.error) {
+            statusEl.textContent = "Error: " + data.error;
+            console.log(data);
+            return;
+          }
+
+          // If success → update status
+          statusEl.textContent = "Done ✅";
+
+          // If backend sent an image → display it
+          if (data.url || data.image_url) {
+            const img = document.createElement("img");
+            img.src = data.url || data.image_url;
+            resultEl.appendChild(img);
+          }
+
+          // If backend sent a video → display it
+          if (data.video_url) {
+            const vid = document.createElement("video");
+            vid.src = data.video_url;
+            vid.controls = true;
+            resultEl.appendChild(vid);
+          }
+
+        } catch (err) {
+          // If fetch fails (e.g. server down)
+          statusEl.textContent = "Network error ❌";
+          console.error(err);
+        }
+      }
+
+      // Hook up buttons to the right endpoints
+      document.getElementById("imgBtn").onclick = () => callApi("/generate-image");
+      document.getElementById("vidBtn").onclick = () => callApi("/generate-video");
+
+      // List of fun random prompts
+      const surprisePrompts = [
+        "A raccoon CEO giving a TED talk",
+        "A robot painting a self-portrait in watercolor",
+        "Shakespeare texting on an iPhone",
+        "A cat DJing under neon lights",
+        "A futuristic city floating in the clouds",
+        "A dragon flying over Times Square",
+        "A pirate ship made of candy",
+        "A llama in a superhero costume"
+      ];
+
+      // Surprise Me button picks a random one
+      document.getElementById("surpriseBtn").onclick = () => {
+        const randomPrompt = surprisePrompts[Math.floor(Math.random() * surprisePrompts.length)];
+        promptEl.value = randomPrompt; // autofill the input
+        statusEl.textContent = `Surprise prompt: "${randomPrompt}" 🎉`;
+      };
+    </script>
+  </body>
+</html>
