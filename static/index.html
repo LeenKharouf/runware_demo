@@ -3,96 +3,192 @@
   <head>
     <meta charset="utf-8" />
     <title>Runware Demo</title>
-
-    <!-- Link to external CSS file (for styling) -->
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+      #debug {
+        margin-top: 20px;
+        padding: 10px;
+        background: #2a2d36;
+        color: #f5f6fa;
+        border-radius: 6px;
+        font-size: 14px;
+        white-space: pre-wrap;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .spinner {
+        margin: 20px auto;
+        border: 6px solid #393b47;
+        border-top: 6px solid #7c5cff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
   </head>
   <body>
-    <!-- Title + subtitle -->
     <h1>Build with Runware, in seconds</h1>
     <p>Type a prompt, then click a button to see the magic.</p>
 
-    <!-- Input row: prompt box + buttons -->
     <div class="row">
-      <!-- Where the user types their idea -->
       <input id="prompt" placeholder="e.g., a fox in watercolor" style="flex:1" />
-
-      <!-- Buttons to trigger different endpoints -->
       <button id="imgBtn">Image</button>
       <button id="vidBtn">Video</button>
       <button id="surpriseBtn">🎲 Surprise Me</button>
     </div>
 
-    <!-- Status updates (e.g. “Generating…” or “Done ✅”) -->
     <div id="status"></div>
-
-    <!-- Where generated images/videos will appear -->
+    <div id="spinner" style="display:none;" class="spinner"></div>
     <div id="result"></div>
+    <!-- <h3>Debug (Raw API Response)</h3> -->
+    <!-- <div id="debug">Nothing yet...</div> -->
 
     <script>
-      // Grab references to elements in the page
       const promptEl = document.getElementById('prompt');
       const statusEl = document.getElementById('status');
       const resultEl = document.getElementById('result');
+      const debugEl = document.getElementById('debug');
+      const spinnerEl = document.getElementById('spinner');
 
-      // Generic function: call one of my Flask endpoints
-      async function callApi(endpoint) {
+      // ---------------- IMAGE GENERATION ----------------
+      async function callImageApi() {
         const prompt = promptEl.value.trim();
         if (!prompt) {
           alert("Please enter a prompt!");
           return;
         }
 
-        // Show a loading message
-        statusEl.textContent = "Generating… please wait ⏳";
+        statusEl.textContent = "Generating image… please wait ⏳";
         resultEl.innerHTML = "";
+        spinnerEl.style.display = "block";
+        // debugEl.textContent = "Waiting for response...";
 
         try {
-          // Send prompt to backend (Flask)
-          const res = await fetch(endpoint, {
+          const res = await fetch("/generate-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt })
+          });
+        let data;
+        try {
+        data = await res.json();
+        } catch (err) {
+        statusEl.textContent = "❌ Failed to parse server response";
+        debugEl.textContent = await res.text();
+        spinnerEl.style.display = "none";
+        return;
+        }
+
+        //   debugEl.textContent = JSON.stringify(data, null, 2);
+
+          if (data.error) {
+            statusEl.textContent = "Error: " + data.error;
+            spinnerEl.style.display = "none";
+            return;
+          }
+
+          statusEl.textContent = "Image ready ✅";
+          const imageUrl = data.data?.[0]?.imageURL;
+          if (imageUrl) {
+            const img = document.createElement("img");
+            img.src = imageUrl;
+            resultEl.appendChild(img);
+          } else {
+            statusEl.textContent = "No image URL found 🤔";
+          }
+        } catch (err) {
+          statusEl.textContent = "Network error ❌";
+          debugEl.textContent = err.toString();
+        } finally {
+          spinnerEl.style.display = "none";
+        }
+      }
+
+      // ---------------- VIDEO GENERATION ----------------
+      async function callVideoApi() {
+        const prompt = promptEl.value.trim();
+        if (!prompt) {
+          alert("Please enter a prompt!");
+          return;
+        }
+
+        statusEl.textContent = "Submitting video request… 🎬";
+        resultEl.innerHTML = "";
+        spinnerEl.style.display = "block";
+        debugEl.textContent = "Waiting for response...";
+
+        try {
+          // Step 1: start job
+          const res = await fetch("/generate-video", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ prompt })
           });
           const data = await res.json();
+          debugEl.textContent = JSON.stringify(data, null, 2);
 
-          // Handle errors from backend
           if (data.error) {
             statusEl.textContent = "Error: " + data.error;
-            console.log(data);
+            spinnerEl.style.display = "none";
             return;
           }
 
-          // If success → update status
-          statusEl.textContent = "Done ✅";
+          const taskUUID = data.data?.[0]?.taskUUID;
+          if (!data.data || data.data.length === 0) {
+            const msg = data.errors?.[0]?.message || "Unknown error";
+            statusEl.textContent = "Video request failed ❌: " + msg;
+            spinnerEl.style.display = "none";
+            return;
+         }
 
-          // If backend sent an image → display it
-          if (data.url || data.image_url) {
-            const img = document.createElement("img");
-            img.src = data.url || data.image_url;
-            resultEl.appendChild(img);
+
+          statusEl.textContent = "Video is cooking… 🍿 (this may take 1–2 min)";
+
+          // Step 2: Poll until ready (24 attempts = 2 minutes)
+          let videoReady = false;
+          for (let i = 0; i < 24; i++) {
+            const check = await fetch(`/check-video/${taskUUID}`);
+            const statusData = await check.json();
+            // debugEl.textContent = JSON.stringify(statusData, null, 2);
+
+            const videoUrl = statusData.data?.[0]?.videoURL;
+            if (videoUrl) {
+              const vid = document.createElement("video");
+              vid.src = videoUrl;
+              vid.controls = true;
+              resultEl.appendChild(vid);
+
+              statusEl.textContent = "Video ready ✅";
+              spinnerEl.style.display = "none";
+              videoReady = true;
+              break;
+            }
+
+            statusEl.textContent = `Still processing ⏳ (attempt ${i+1}/24)…`;
+            await new Promise(resolve => setTimeout(resolve, 5000));
           }
 
-          // If backend sent a video → display it
-          if (data.video_url) {
-            const vid = document.createElement("video");
-            vid.src = data.video_url;
-            vid.controls = true;
-            resultEl.appendChild(vid);
+          if (!videoReady) {
+            statusEl.textContent = "Still not ready 😅 — try again later with taskUUID.";
+            spinnerEl.style.display = "none";
           }
-
         } catch (err) {
-          // If fetch fails (e.g. server down)
           statusEl.textContent = "Network error ❌";
-          console.error(err);
+          debugEl.textContent = err.toString();
+          spinnerEl.style.display = "none";
         }
       }
 
-      // Hook up buttons to the right endpoints
-      document.getElementById("imgBtn").onclick = () => callApi("/generate-image");
-      document.getElementById("vidBtn").onclick = () => callApi("/generate-video");
+      // ---------------- BUTTON HOOKS ----------------
+      document.getElementById("imgBtn").onclick = () => callImageApi();
+      document.getElementById("vidBtn").onclick = () => callVideoApi();
 
-      // List of fun random prompts
+      // ---------------- SURPRISE PROMPTS ----------------
       const surprisePrompts = [
         "A raccoon CEO giving a TED talk",
         "A robot painting a self-portrait in watercolor",
@@ -103,11 +199,9 @@
         "A pirate ship made of candy",
         "A llama in a superhero costume"
       ];
-
-      // Surprise Me button picks a random one
       document.getElementById("surpriseBtn").onclick = () => {
         const randomPrompt = surprisePrompts[Math.floor(Math.random() * surprisePrompts.length)];
-        promptEl.value = randomPrompt; // autofill the input
+        promptEl.value = randomPrompt;
         statusEl.textContent = `Surprise prompt: "${randomPrompt}" 🎉`;
       };
     </script>
